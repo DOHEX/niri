@@ -1523,7 +1523,7 @@ impl<W: LayoutElement> Monitor<W> {
                 // Subtract its index times the current span to recover the first workspace's
                 // position; this keeps simultaneous zoom and switching monotonic.
                 let from = progress_anim.from();
-                let from_zoom = compute_overview_zoom(self.options.overview.zoom, Some(from));
+                let from_zoom = compute_overview_zoom(self.overview_zoom, Some(from));
                 let from_ws_switch_span = self.workspace_switch_span_with_gap(from_zoom);
 
                 let zoom = self.overview_zoom();
