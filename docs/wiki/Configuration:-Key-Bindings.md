@@ -601,3 +601,18 @@ binds {
     Mod+Ctrl+C { move-window-to-new-workspace-below "chat" focus=false; }
 }
 ```
+#### `toggle-dwt`
+
+<sup>Since: next release</sup>
+
+Toggle disable-while-typing on or off at runtime.
+This provides a quick way to disable DWT without editing the config file.
+
+```kdl
+binds {
+    Mod+F10 { toggle-dwt; }
+}
+```
+
+The toggle state is combined with the [`dwt` setting](./Configuration:-Input.md#pointing-devices) in the config: both the config and the toggle must enable DWT for it to be active.
+The toggle state resets when niri restarts, and applies to newly hot-plugged touchpads.
