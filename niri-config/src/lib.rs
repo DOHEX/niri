@@ -1234,6 +1234,7 @@ mod tests {
 
             output "eDP-1" {
                 focus-at-startup
+                isolated
                 scale 2
                 transform "flipped-90"
                 position x=10 y=20
@@ -1719,6 +1720,7 @@ mod tests {
                         allow_tearing: Always,
                         drm_lease: false,
                         focus_at_startup: true,
+                        isolated: true,
                         background_color: Some(
                             Color {
                                 r: 0.09803922,
@@ -1765,6 +1767,7 @@ mod tests {
                         allow_tearing: Fullscreen,
                         drm_lease: false,
                         focus_at_startup: false,
+                        isolated: false,
                         background_color: None,
                         backdrop_color: None,
                         hot_corners: None,
@@ -1799,6 +1802,7 @@ mod tests {
                         allow_tearing: Fullscreen,
                         drm_lease: false,
                         focus_at_startup: false,
+                        isolated: false,
                         background_color: None,
                         backdrop_color: None,
                         hot_corners: None,
