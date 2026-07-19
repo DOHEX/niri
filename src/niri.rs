@@ -5495,9 +5495,11 @@ impl Niri {
         self.exit_confirm_dialog
             .render(ctx.renderer, output, &mut |elem| push(elem.into()));
 
-        // Next, the config error notification too.
-        if let Some(element) = self.config_error_notification.render(ctx.renderer, output) {
-            push(element.into());
+        // Next, the config error notification too. Isolated outputs stay free of compositor chrome.
+        if !self.is_output_isolated(output) {
+            if let Some(element) = self.config_error_notification.render(ctx.renderer, output) {
+                push(element.into());
+            }
         }
 
         // If the session is locked, draw the lock surface.
@@ -5548,14 +5550,18 @@ impl Niri {
             return;
         }
 
-        // Draw the hotkey overlay on top.
-        if let Some(element) = self.hotkey_overlay.render(ctx.renderer, output) {
-            push(element.into());
-        }
+        // The hotkey overlay and Alt-Tab switcher are compositor chrome, so keep them off isolated
+        // outputs (projection/signage/capture); windows and layer-shell content still render below.
+        if !self.is_output_isolated(output) {
+            // Draw the hotkey overlay on top.
+            if let Some(element) = self.hotkey_overlay.render(ctx.renderer, output) {
+                push(element.into());
+            }
 
-        // Then, the Alt-Tab switcher.
-        self.window_mru_ui
-            .render_output(self, output, ctx.r(), &mut |elem| push(elem.into()));
+            // Then, the Alt-Tab switcher.
+            self.window_mru_ui
+                .render_output(self, output, ctx.r(), &mut |elem| push(elem.into()));
+        }
 
         // Then the minimized-window strip, below the Alt-Tab switcher but above the layout, since
         // it's a persistent overlay rather than a modal one.
