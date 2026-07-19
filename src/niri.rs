@@ -3926,6 +3926,7 @@ impl Niri {
                 layout.background_color = c.and_then(|c| c.background_color);
             }
         }
+        let isolated = c.is_some_and(|c| c.isolated);
         drop(config);
 
         // Set scale and transform before adding to the layout since that will read the output size.
@@ -3936,7 +3937,7 @@ impl Niri {
             None,
         );
 
-        self.layout.add_output(output.clone(), layout_config);
+        self.layout.add_output(output.clone(), layout_config, isolated);
 
         let lock_render_state = if self.is_locked() {
             // We haven't rendered anything yet so it's as good as locked.

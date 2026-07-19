@@ -855,7 +855,7 @@ impl Op {
                     model: None,
                     serial: None,
                 });
-                layout.add_output(output.clone(), None);
+                layout.add_output(output.clone(), None, false);
             }
             Op::AddScaledOutput {
                 id,
@@ -892,7 +892,7 @@ impl Op {
                     model: None,
                     serial: None,
                 });
-                layout.add_output(output.clone(), layout_config.map(|x| *x));
+                layout.add_output(output.clone(), layout_config.map(|x| *x), false);
             }
             Op::SetOutputScale { id, scale } => {
                 let name = format!("output{id}");
