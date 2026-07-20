@@ -10,7 +10,7 @@ use super::*;
 
 fn power_off_monitors(f: &mut Fixture) {
     let crate::niri::State { backend, niri } = f.niri_state();
-    niri.deactivate_monitors(backend);
+    niri.deactivate_monitors(backend, false);
 }
 
 fn power_on_monitors(f: &mut Fixture) {

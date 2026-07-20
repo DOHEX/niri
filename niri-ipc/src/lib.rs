@@ -226,8 +226,12 @@ pub enum Action {
         #[cfg_attr(feature = "clap", arg(required = true))]
         vt: u8,
     },
-    /// Power off all monitors via DPMS.
-    PowerOffMonitors {},
+    /// Power off monitors via DPMS.
+    PowerOffMonitors {
+        /// Leave outputs marked `isolated` powered on (e.g. for signage on an idle timeout).
+        #[cfg_attr(feature = "clap", arg(short, long))]
+        skip_isolated: bool,
+    },
     /// Power on all monitors via DPMS.
     PowerOnMonitors {},
     /// Spawn a command.
