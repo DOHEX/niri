@@ -95,6 +95,8 @@ pub struct Mapped {
 
     /// Whether this window is floating.
     is_floating: bool,
+    /// Whether this window is sticky across all workspaces on its output.
+    is_sticky: bool,
 
     /// Whether this window is minimized, i.e. held outside the layout.
     is_minimized: bool,
@@ -296,6 +298,7 @@ impl Mapped {
             is_active_in_column: true,
             is_floating: false,
             is_minimized: false,
+            is_sticky: false,
             is_window_cast_target: false,
             ignore_opacity_window_rule: false,
             block_out_buffer: RefCell::new(SolidColorBuffer::new((0., 0.), [0., 0., 0., 1.])),
@@ -404,6 +407,10 @@ impl Mapped {
     /// Whether a `block-minimize` window rule prevents the client from minimizing itself.
     pub fn is_blocking_minimize(&self) -> bool {
         self.rules.block_minimize.unwrap_or(false)
+    }
+
+    pub fn is_sticky(&self) -> bool {
+        self.is_sticky
     }
 
     pub fn is_window_cast_target(&self) -> bool {
@@ -1065,6 +1072,12 @@ impl LayoutElement for Mapped {
 
     fn is_blocking_minimize(&self) -> bool {
         self.rules.block_minimize.unwrap_or(false)
+    }
+
+    fn set_sticky(&mut self, sticky: bool) {
+        let changed = self.is_sticky != sticky;
+        self.is_sticky = sticky;
+        self.need_to_recompute_rules |= changed;
     }
 
     fn set_bounds(&self, bounds: Size<i32, Logical>) {

@@ -26,7 +26,7 @@ use super::shadow::Shadow;
 use super::tile::{Tile, TileRenderElement, TileRenderSnapshot};
 use super::{
     ActivateWindow, HitType, InsertPosition, InteractiveResizeData, LayoutElement, Options,
-    RemovedTile, SizeFrac,
+    RemovedTile, SizeFrac, StickyRestoreInfo, StickyRestorePosition,
 };
 use crate::animation::Clock;
 use crate::layout::{LayoutElementRenderElement, RenderLayer};
@@ -114,6 +114,15 @@ pub struct Workspace<W: LayoutElement> {
 
     /// Unique ID of this workspace.
     id: WorkspaceId,
+
+    /// Hidden workspaces need to track their original idx
+    pub original_idx: Option<usize>,
+
+    /// whether we should hide this workspace for indexing
+    pub hidden: bool,
+
+    /// whether this workspace needs to be hidden
+    pub needs_hidden: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -259,6 +268,9 @@ impl<W: LayoutElement> Workspace<W> {
 
         let shadow_config =
             compute_workspace_shadow_config(options.overview.workspace_shadow, view_size);
+        let is_hidden = config
+            .as_mut()
+            .is_some_and(|c| c.hidden.is_some_and(|hidden| hidden));
 
         Self {
             scrolling,
@@ -275,6 +287,9 @@ impl<W: LayoutElement> Workspace<W> {
             clock,
             base_options,
             options,
+            original_idx: None, // We don't know this yet.
+            hidden: is_hidden,
+            needs_hidden: false,
             name: config.map(|c| c.name.0),
             layout_config,
             id: WorkspaceId::next(),
@@ -322,6 +337,10 @@ impl<W: LayoutElement> Workspace<W> {
         let shadow_config =
             compute_workspace_shadow_config(options.overview.workspace_shadow, view_size);
 
+        let is_hidden = config
+            .as_mut()
+            .is_some_and(|c| c.hidden.is_some_and(|hidden| hidden));
+
         Self {
             scrolling,
             floating,
@@ -337,6 +356,9 @@ impl<W: LayoutElement> Workspace<W> {
             clock,
             base_options,
             options,
+            original_idx: None,
+            hidden: is_hidden,
+            needs_hidden: false,
             name: config.map(|c| c.name.0),
             layout_config,
             id: WorkspaceId::next(),
@@ -482,6 +504,57 @@ impl<W: LayoutElement> Workspace<W> {
         self.floating.has_window(id)
     }
 
+    pub(super) fn sticky_restore_info_for_window(
+        &self,
+        id: &W::Id,
+    ) -> Option<StickyRestoreInfo<W::Id>> {
+        if self.floating.has_window(id) {
+            return Some(StickyRestoreInfo {
+                workspace_id: self.id(),
+                position: StickyRestorePosition::Floating,
+                next_to: None,
+            });
+        }
+
+        let mut position = None;
+        let mut next_to = None;
+
+        for (column_idx, column) in self.scrolling.columns().enumerate() {
+            let mut prev_id = None;
+            for (tile_idx, (tile, _)) in column.tiles().enumerate() {
+                if tile.window().id() == id {
+                    position = Some((column_idx, tile_idx));
+                    next_to = prev_id;
+                    break;
+                }
+                prev_id = Some(tile.window().id().clone());
+            }
+            if position.is_some() {
+                break;
+            }
+        }
+
+        if let Some((column_idx, tile_idx)) = position {
+            Some(StickyRestoreInfo {
+                workspace_id: self.id(),
+                position: StickyRestorePosition::Tiling {
+                    column_idx,
+                    tile_idx,
+                },
+                next_to,
+            })
+        } else {
+            None
+        }
+    }
+
+    pub(super) fn tiling_column_len(&self, column_idx: usize) -> Option<usize> {
+        self.scrolling
+            .columns()
+            .nth(column_idx)
+            .map(|col| col.tiles().count())
+    }
+
     pub fn current_output(&self) -> Option<&Output> {
         self.output.as_ref()
     }
@@ -567,7 +640,9 @@ impl<W: LayoutElement> Workspace<W> {
     }
 
     pub fn update_output_size(&mut self) {
-        let output = self.output.as_ref().unwrap();
+        let Some(output) = self.output.as_ref() else {
+            return;
+        };
         let scale = output.current_scale();
         let transform = output.current_transform();
         let view_size = output_size(output);
@@ -1698,8 +1773,14 @@ impl<W: LayoutElement> Workspace<W> {
         let scrolling = self.scrolling.tiles_with_render_positions();
 
         let floating = self.floating.tiles_with_render_positions();
-        let visible = self.is_floating_visible();
-        let floating = floating.map(move |(tile, pos)| (tile, pos, visible));
+        let base_visible = self.is_floating_visible();
+        let floating = floating.map(move |(tile, pos)| {
+            if tile.window().rules().float_above_fullscreen == Some(true) {
+                (tile, pos, true)
+            } else {
+                (tile, pos, base_visible)
+            }
+        });
 
         floating.chain(scrolling)
     }
@@ -1780,9 +1861,7 @@ impl<W: LayoutElement> Workspace<W> {
         R::Error: Send + Sync + 'static,
         TileRenderElement<R>: RenderElement<R>,
     {
-        if !self.is_floating_visible() && layer.is_normal() {
-            return;
-        }
+        let base_visible = self.is_floating_visible();
 
         let view_rect = Rectangle::from_size(self.view_size);
         let floating_focus_ring = focus_ring && self.floating_is_active();
@@ -1792,6 +1871,7 @@ impl<W: LayoutElement> Workspace<W> {
             view_rect,
             floating_focus_ring,
             layer,
+            base_visible,
             &mut |elem| push(elem.into()),
         );
     }
@@ -1906,14 +1986,19 @@ impl<W: LayoutElement> Workspace<W> {
 
     pub fn window_under(&self, pos: Point<f64, Logical>) -> Option<(&W, HitType)> {
         // This logic is consistent with tiles_with_render_positions().
-        if self.is_floating_visible() {
-            if let Some(rv) = self
-                .floating
+        let base_visible = self.is_floating_visible();
+        if let Some(rv) =
+            self.floating
                 .tiles_with_render_positions()
-                .find_map(|(tile, tile_pos)| HitType::hit_tile(tile, tile_pos, pos))
-            {
-                return Some(rv);
-            }
+                .find_map(|(tile, tile_pos)| {
+                    if base_visible || tile.window().rules().float_above_fullscreen == Some(true) {
+                        HitType::hit_tile(tile, tile_pos, pos)
+                    } else {
+                        None
+                    }
+                })
+        {
+            return Some(rv);
         }
 
         self.scrolling.window_under(pos)
@@ -1964,8 +2049,11 @@ impl<W: LayoutElement> Workspace<W> {
     pub fn refresh(&mut self, is_active: bool, is_focused: bool) {
         self.scrolling
             .refresh(is_active && !self.floating_is_active.get(), is_focused);
-        self.floating
-            .refresh(is_active && self.floating_is_active.get(), is_focused);
+        self.floating.refresh(
+            is_active && self.floating_is_active.get(),
+            is_focused,
+            false,
+        );
     }
 
     pub fn scroll_amount_to_activate(&self, window: &W::Id) -> f64 {

@@ -1911,13 +1911,14 @@ impl State {
                 }
             }
             Action::FocusWorkspace(reference) => {
+                let is_name = matches!(reference, WorkspaceReference::Name(_));
                 let Some((output, index)) = self.niri.resolve_workspace_reference(reference) else {
                     return;
                 };
 
                 if let Some(output) = output {
                     self.niri.layout.focus_output(&output);
-                    self.niri.layout.switch_workspace(index);
+                    self.niri.layout.switch_workspace(index, is_name);
                     if !self.maybe_warp_cursor_to_focus_centered() {
                         self.move_cursor_to_output(&output);
                     }
@@ -1926,7 +1927,7 @@ impl State {
                     if config.borrow().input.workspace_auto_back_and_forth {
                         self.niri.layout.switch_workspace_auto_back_and_forth(index);
                     } else {
-                        self.niri.layout.switch_workspace(index);
+                        self.niri.layout.switch_workspace(index, is_name);
                     }
                     self.maybe_warp_cursor_to_focus();
                 }
@@ -2616,6 +2617,20 @@ impl State {
                     self.niri.queue_redraw_all();
                 }
             }
+            Action::ToggleWindowSticky => {
+                self.niri.layout.toggle_window_sticky(None);
+                // FIXME: granular
+                self.niri.queue_redraw_all();
+            }
+            Action::ToggleWindowStickyById(id) => {
+                let window = self.niri.layout.windows().find(|(_, m)| m.id().get() == id);
+                let window = window.map(|(_, m)| m.window.clone());
+                if let Some(window) = window {
+                    self.niri.layout.toggle_window_sticky(Some(&window));
+                    // FIXME: granular
+                    self.niri.queue_redraw_all();
+                }
+            }
             Action::MoveWindowToFloating => {
                 self.niri.layout.set_window_floating(None, true);
                 // FIXME: granular
@@ -3033,6 +3048,9 @@ impl State {
                 {
                     self.niri.test_action_count += 1;
                 }
+            }
+            Action::ToggleWorkspaceVisibility(workspace_name) => {
+                self.niri.layout.toggle_workspace_visibility(workspace_name);
             }
         }
     }

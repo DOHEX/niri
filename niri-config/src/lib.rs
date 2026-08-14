@@ -1409,6 +1409,7 @@ mod tests {
                 }
 
                 pinch-sensitivity 1.2
+                float-above-fullscreen true
             }
 
             layer-rule {
@@ -2293,6 +2294,7 @@ mod tests {
                             is_focused: None,
                             is_active_in_column: None,
                             is_floating: None,
+                            is_sticky: None,
                             is_window_cast_target: None,
                             is_urgent: None,
                             at_startup: None,
@@ -2312,6 +2314,7 @@ mod tests {
                             is_focused: None,
                             is_active_in_column: None,
                             is_floating: None,
+                            is_sticky: None,
                             is_window_cast_target: None,
                             is_urgent: None,
                             at_startup: None,
@@ -2327,6 +2330,7 @@ mod tests {
                             ),
                             is_active_in_column: None,
                             is_floating: None,
+                            is_sticky: None,
                             is_window_cast_target: None,
                             is_urgent: None,
                             at_startup: None,
@@ -2356,6 +2360,7 @@ mod tests {
                     open_floating: Some(
                         false,
                     ),
+                    open_sticky: None,
                     open_focused: Some(
                         true,
                     ),
@@ -2426,6 +2431,9 @@ mod tests {
                     geometry_corner_radius: None,
                     clip_to_geometry: None,
                     baba_is_float: None,
+                    float_above_fullscreen: Some(
+                        true,
+                    ),
                     block_out_from: None,
                     block_minimize: None,
                     allow_tearing: None,
@@ -2942,6 +2950,7 @@ mod tests {
                         "eDP-1",
                         "DP-1",
                     ],
+                    hidden: None,
                     layout: None,
                 },
                 Workspace {
@@ -2949,6 +2958,7 @@ mod tests {
                         "workspace-2",
                     ),
                     open_on_output: [],
+                    hidden: None,
                     layout: None,
                 },
                 Workspace {
@@ -2956,6 +2966,7 @@ mod tests {
                         "workspace-3",
                     ),
                     open_on_output: [],
+                    hidden: None,
                     layout: None,
                 },
             ],

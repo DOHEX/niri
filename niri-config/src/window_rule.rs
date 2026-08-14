@@ -34,6 +34,8 @@ pub struct WindowRule {
     #[knuffel(child, unwrap(argument))]
     pub open_floating: Option<bool>,
     #[knuffel(child, unwrap(argument))]
+    pub open_sticky: Option<bool>,
+    #[knuffel(child, unwrap(argument))]
     pub open_focused: Option<bool>,
     #[knuffel(child, unwrap(argument))]
     pub on_xdg_activate: Option<OnXdgActivate>,
@@ -66,6 +68,8 @@ pub struct WindowRule {
     pub clip_to_geometry: Option<bool>,
     #[knuffel(child, unwrap(argument))]
     pub baba_is_float: Option<bool>,
+    #[knuffel(child, unwrap(argument))]
+    pub float_above_fullscreen: Option<bool>,
     #[knuffel(child)]
     pub block_out_from: Option<BlockOutFrom>,
     /// Ignore `xdg_toplevel.set_minimized` coming from the client itself.
@@ -154,6 +158,8 @@ pub struct Match {
     pub is_active_in_column: Option<bool>,
     #[knuffel(property)]
     pub is_floating: Option<bool>,
+    #[knuffel(property)]
+    pub is_sticky: Option<bool>,
     #[knuffel(property)]
     pub is_window_cast_target: Option<bool>,
     #[knuffel(property)]

@@ -289,6 +289,7 @@ fn collect_actions(config: &Config) -> Vec<&Action> {
         &Action::ConsumeOrExpelWindowLeft,
         &Action::ConsumeOrExpelWindowRight,
         &Action::ToggleWindowFloating,
+        &Action::ToggleWindowSticky,
         &Action::SwitchFocusBetweenFloatingAndTiling,
         &Action::ToggleOverview,
     ]);
@@ -516,6 +517,7 @@ fn action_name(action: &Action) -> String {
         Action::ConsumeOrExpelWindowLeft => String::from("Consume or Expel Window Left"),
         Action::ConsumeOrExpelWindowRight => String::from("Consume or Expel Window Right"),
         Action::ToggleWindowFloating => String::from("Move Window Between Floating and Tiling"),
+        Action::ToggleWindowSticky => String::from("Toggle Window Sticky Across Workspaces"),
         Action::SwitchFocusBetweenFloatingAndTiling => {
             String::from("Switch Focus Between Floating and Tiling")
         }
