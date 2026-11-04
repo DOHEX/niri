@@ -545,6 +545,33 @@ impl<W: LayoutElement> Monitor<W> {
         self.active_space == ActiveSpace::Sticky
     }
 
+    pub fn focus_floating(&mut self) {
+        if self.sticky_is_active() {
+            return;
+        }
+        if !self.active_workspace_ref().floating().is_empty() {
+            self.active_workspace().focus_floating();
+        } else if !self.sticky.is_empty() {
+            self.active_space = ActiveSpace::Sticky;
+        }
+    }
+
+    pub fn focus_tiling(&mut self) {
+        if self.active_workspace_ref().scrolling().is_empty() {
+            return;
+        }
+        self.focus_workspace();
+        self.active_workspace().focus_tiling();
+    }
+
+    pub fn switch_focus_floating_tiling(&mut self) {
+        if self.sticky_is_active() || self.active_workspace_ref().floating_is_active() {
+            self.focus_tiling();
+        } else {
+            self.focus_floating();
+        }
+    }
+
     pub fn has_window(&self, window: &W::Id) -> bool {
         self.windows().any(|win| win.id() == window)
     }
@@ -1513,8 +1540,9 @@ impl<W: LayoutElement> Monitor<W> {
             .as_ref()
             .and_then(|hint| hint.workspace.existing_id());
 
+        let workspace_is_active = is_active && !self.sticky_is_active();
         for ws in &mut self.workspaces {
-            ws.update_render_elements(is_active, RenderLayer::MovingBetweenWorkspaces);
+            ws.update_render_elements(workspace_is_active, RenderLayer::MovingBetweenWorkspaces);
         }
 
         let sticky_active = is_active && self.active_space == ActiveSpace::Sticky;
@@ -1523,7 +1551,7 @@ impl<W: LayoutElement> Monitor<W> {
             .update_render_elements(sticky_active, view_rect, RenderLayer::Normal);
 
         for (ws, geo) in self.workspaces_with_render_geo_mut(true) {
-            ws.update_render_elements(is_active, RenderLayer::Normal);
+            ws.update_render_elements(workspace_is_active, RenderLayer::Normal);
 
             if Some(ws.id()) == insert_hint_ws_id {
                 insert_hint_ws_geo = Some(geo);
@@ -2341,6 +2369,8 @@ impl<W: LayoutElement> Monitor<W> {
                 },
             );
         }
+
+        let focus_ring = focus_ring && !self.sticky_is_active();
 
         // Draw in passes for correct Z ordering during window movement between workspaces:
         // - floating windows moving between workspaces
