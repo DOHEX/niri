@@ -16,6 +16,7 @@ mod remove_output;
 mod shader_runtime;
 mod suspended;
 mod transactions;
+mod virtual_output;
 mod virtual_pointer;
 mod window_opening;
 mod xdg_decoration;
