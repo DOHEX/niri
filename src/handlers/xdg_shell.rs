@@ -18,7 +18,7 @@ use smithay::reexports::wayland_server::protocol::wl_output;
 use smithay::reexports::wayland_server::protocol::wl_seat::WlSeat;
 use smithay::reexports::wayland_server::protocol::wl_surface::WlSurface;
 use smithay::reexports::wayland_server::{self, Resource, WEnum};
-use smithay::utils::{Logical, Rectangle, Serial};
+use smithay::utils::{Logical, Point, Rectangle, Serial};
 use smithay::wayland::compositor::{
     add_pre_commit_hook, with_states, BufferAssignment, HookId, SurfaceAttributes,
 };
@@ -359,6 +359,13 @@ impl XdgShellHandler for State {
                         let _ = PopupManager::dismiss_popup(&root, &popup);
                         return;
                     }
+                }
+
+                let mon = self.niri.layout.monitor_for_output(output).unwrap();
+                if mon.render_above_top_layer() && layer.layer() != Layer::Overlay {
+                    trace!("ignoring popup grab for a layer surface below fullscreen window");
+                    let _ = PopupManager::dismiss_popup(&root, &popup);
+                    return;
                 }
             } else {
                 // This is a grab for a regular window; check that there's no layer surface with a
@@ -1066,23 +1073,9 @@ impl XdgDecorationHandler for State {
         }
     }
 
-    fn decoration_destroyed(&mut self, toplevel: ToplevelSurface) {
-        // The protocol requires the surface to switch back to client-side decorations at the
-        // next commit, unless a new decoration object is created first (in which case
-        // new_decoration() will run before any commit and override this).
-        toplevel.with_pending_state(|state| {
-            state.decoration_mode = Some(zxdg_toplevel_decoration_v1::Mode::ClientSide);
-        });
-
-        if toplevel.is_initial_configure_sent() {
-            // If this is a mapped window, flag it as needs configure to avoid duplicate configures.
-            let surface = toplevel.wl_surface();
-            if let Some((mapped, _)) = self.niri.layout.find_window_and_output_mut(surface) {
-                mapped.set_needs_configure();
-            } else {
-                toplevel.send_configure();
-            }
-        }
+    fn decoration_destroyed(&mut self, _toplevel: ToplevelSurface) {
+        // We rely on Smithay's decoration_mode (which it resets on its own), and don't track any
+        // state on our own. Nothing to do here.
     }
 }
 
@@ -1171,8 +1164,8 @@ impl State {
         let mon = mon.or_else(|| {
             rules
                 .open_on_output
-                .as_deref()
-                .and_then(|name| {
+                .iter()
+                .find_map(|name| {
                     self.niri
                         .global_space
                         .outputs()
@@ -1373,12 +1366,17 @@ impl State {
     }
 
     fn unconstrain_window_popup(&self, popup: &PopupKind, window: &Window) {
+        let ime = matches!(popup, PopupKind::InputMethod(_));
+
         // The target geometry for the positioner should be relative to its parent's geometry, so
         // we will compute that here.
-        let mut target = self.niri.layout.popup_target_rect(window);
+        let mut target = self.niri.layout.popup_target_rect(window, ime);
         target.loc -= get_popup_toplevel_coords(popup).to_f64();
 
-        self.position_popup_within_rect(popup, target, true);
+        let geo_off = window.geometry().loc.to_f64();
+
+        // Don't add padding for IME popups; better to give them more space.
+        self.position_popup_within_rect(popup, geo_off, target, !ime);
     }
 
     pub fn unconstrain_layer_shell_popup(
@@ -1412,13 +1410,17 @@ impl State {
         target.loc -= layer_geo.loc;
         target.loc -= get_popup_toplevel_coords(popup);
 
+        // Layer surfaces don't have geometry.
+        let geo_off = Point::new(0., 0.);
+
         // Don't add padding to layer-shell popups. It's not really needed, and it's unexpected.
-        self.position_popup_within_rect(popup, target.to_f64(), false);
+        self.position_popup_within_rect(popup, geo_off, target.to_f64(), false);
     }
 
     fn position_popup_within_rect(
         &self,
         popup: &PopupKind,
+        geo_off: Point<f64, Logical>,
         target: Rectangle<f64, Logical>,
         padding: bool,
     ) {
@@ -1435,6 +1437,11 @@ impl State {
                 });
             }
             PopupKind::InputMethod(popup) => {
+                // IME popups are positioned in surface-local coordinates, but target is in
+                // geometry-relative coordinates.
+                let mut target = target;
+                target.loc += geo_off;
+
                 let text_input_rectangle = popup.text_input_rectangle();
                 let mut bbox =
                     utils::bbox_from_surface_tree(popup.wl_surface(), text_input_rectangle.loc)
@@ -1446,7 +1453,7 @@ impl State {
                     bbox.loc.x -= overflow_x;
                 }
 
-                // Ensure that the popup starts within the window.
+                // Ensure that the popup starts within the target rect.
                 bbox.loc.x = f64::max(bbox.loc.x, target.loc.x);
 
                 // Try to position IME popup below the text input rectangle.

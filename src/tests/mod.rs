@@ -4,9 +4,11 @@ mod client;
 mod fixture;
 mod gpu;
 mod server;
+mod test_input_backend;
 
 mod animations;
 mod color_management;
+mod binds;
 mod floating;
 mod fullscreen;
 mod layer_shell;
